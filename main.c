@@ -74,20 +74,22 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 
 	for (int pixel = 0; pixel < inputImage->height * inputImage->width; pixel++)
 	{
+		struct Pixel currentPixel = inputImage->pixels[pixel];
 		// If run > 0 and the current pixel is not the same as the previous pixel, write the run.
 		// If All the same then increment run ALSO HANDLE CASE IF RUN > 62
-		if (matchingPixels(&inputImage->pixels[pixel], &prevPixel))
+		if (matchingPixels(&currentPixel, &prevPixel))
 		{
 			if (run == 62)
 			{
 				// Run is max
 				// Save Run
+				// Handle more than 62 in a row
 			}
 			else
 			{
-				// Handle more than 62 in a row
 				run++;
 			}
+			// Can continue because changing the prev pixel & array do not need to be changed
 			continue;
 		}
 
@@ -95,16 +97,37 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 		{
 			// Save Run
 		}
-
+		unsigned int QOIHash = getQOIHash(&currentPixel);
 		// If in array then OP_INDEX
-		if (matchingPixels(&inputImage->pixels[pixel], &runningArray[getQOIHash(&inputImage->pixels[pixel])]))
+		if (matchingPixels(&currentPixel, &runningArray[getQOIHash]))
 		{
 			// OP_INDEX
 		}
-		// Try OP_DIFF
-		// Try OP_LUMA
-		// IF alpha is the same then OP_RGB
-		// OP_RGBA
+		else if (currentPixel->a == prevPixel->a)
+		{
+			// Try OP_DIFF
+			// Try OP_LUMA
+			// Otherwise OP_RGB
+			outputImage->data[dataIndex] = 0xFE;
+			outputImage->data[dataIndex + 1] = currentPixel->r;
+			outputImage->data[dataIndex + 2] = currentPixel->g;
+			outputImage->data[dataIndex + 3] = currentPixel->b;
+			dataIndex += 4;
+		}
+		else
+		{
+			// OP_RGBA
+			outputImage->data[dataIndex] = 0xFF;
+			outputImage->data[dataIndex + 1] = currentPixel->r;
+			outputImage->data[dataIndex + 2] = currentPixel->g;
+			outputImage->data[dataIndex + 3] = currentPixel->b;
+			outputImage->data[dataIndex + 4] = currentPixel->a;
+			dataIndex += 5;
+		}
+
+		// Save current pixel
+		prevPixel = currentPixel;
+		runningArray[QOIHash] = currentPixel;
 	}
 
 	// 8 Byte footer (7 0x00s followed by a 0x01)
