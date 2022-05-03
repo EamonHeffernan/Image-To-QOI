@@ -83,7 +83,9 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 			{
 				// Run is max
 				// Save Run
-				// Handle more than 62 in a row
+				outputImage->data[dataIndex] = 0b11000000 | run - 1;
+				dataIndex++;
+				run = 1;
 			}
 			else
 			{
@@ -96,32 +98,39 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 		if (run > 0)
 		{
 			// Save Run
+			outputImage->data[dataIndex] = 0b11000000 | run - 1;
+			dataIndex++;
+			run = 0;
 		}
 		unsigned int QOIHash = getQOIHash(&currentPixel);
 		// If in array then OP_INDEX
-		if (matchingPixels(&currentPixel, &runningArray[getQOIHash]))
+		if (matchingPixels(&currentPixel, &runningArray[QOIHash]))
 		{
 			// OP_INDEX
+			outputImage->data[dataIndex] = 0b00000000 | QOIHash;
+			dataIndex++;
 		}
-		else if (currentPixel->a == prevPixel->a)
+		else if (currentPixel.a == prevPixel.a)
 		{
 			// Try OP_DIFF
+
 			// Try OP_LUMA
+
 			// Otherwise OP_RGB
 			outputImage->data[dataIndex] = 0xFE;
-			outputImage->data[dataIndex + 1] = currentPixel->r;
-			outputImage->data[dataIndex + 2] = currentPixel->g;
-			outputImage->data[dataIndex + 3] = currentPixel->b;
+			outputImage->data[dataIndex + 1] = currentPixel.r;
+			outputImage->data[dataIndex + 2] = currentPixel.g;
+			outputImage->data[dataIndex + 3] = currentPixel.b;
 			dataIndex += 4;
 		}
 		else
 		{
 			// OP_RGBA
 			outputImage->data[dataIndex] = 0xFF;
-			outputImage->data[dataIndex + 1] = currentPixel->r;
-			outputImage->data[dataIndex + 2] = currentPixel->g;
-			outputImage->data[dataIndex + 3] = currentPixel->b;
-			outputImage->data[dataIndex + 4] = currentPixel->a;
+			outputImage->data[dataIndex + 1] = currentPixel.r;
+			outputImage->data[dataIndex + 2] = currentPixel.g;
+			outputImage->data[dataIndex + 3] = currentPixel.b;
+			outputImage->data[dataIndex + 4] = currentPixel.a;
 			dataIndex += 5;
 		}
 
