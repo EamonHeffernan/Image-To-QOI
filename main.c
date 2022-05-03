@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -13,12 +14,111 @@ struct Pixel
 
 struct InputImage
 {
-	int width;
-	int height;
+	unsigned int width;
+	unsigned int height;
 	char *fileLocation;
 	// InputType inputType;
 	struct Pixel *pixels;
 };
+
+struct OutputImage
+{
+	unsigned int width;
+	unsigned int height;
+	char *fileLocation;
+	char *data;
+	unsigned int dataSize;
+};
+
+bool matchingPixels(struct Pixel *p1, struct Pixel *p2)
+{
+	return p1->r == p2->r && p1->g == p2->g && p1->b == p2->b && p1->a == p2->a;
+};
+
+int getQOIHash(struct Pixel *p)
+{
+	return (p->r * 3 + p->g * 5 + p->b * 7 + p->a * 11) % 64;
+};
+
+int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
+{
+	// There are 14 bytes in the header and 8 in the the footer.
+	// 5 bytes is the largest possible size of one pixel.
+	// Therefore 5 * the number of pixels + 22 is the maximum size of the array.
+	outputImage->data = malloc(5 * inputImage->height * inputImage->width + 22);
+
+	struct Pixel *runningArray = malloc(sizeof(struct Pixel) * 64);
+
+	struct Pixel prevPixel;
+
+	prevPixel.r = 0x00;
+	prevPixel.g = 0x00;
+	prevPixel.b = 0x00;
+	prevPixel.a = 0xFF;
+
+	// 14 Byte Header
+	// 4 Bytes
+	outputImage->data[0] = 'q';
+	outputImage->data[1] = 'o';
+	outputImage->data[2] = 'i';
+	outputImage->data[3] = 'f';
+	// 4 Bytes
+	outputImage->data[4] = inputImage->width;
+	// 4 Bytes
+	outputImage->data[8] = inputImage->height;
+	outputImage->data[12] = 0x04;
+	outputImage->data[13] = 0x00;
+
+	int dataIndex = 14;
+	unsigned char run = 0;
+
+	for (int pixel = 0; pixel < inputImage->height * inputImage->width; pixel++)
+	{
+		// If run > 0 and the current pixel is not the same as the previous pixel, write the run.
+		// If All the same then increment run ALSO HANDLE CASE IF RUN > 62
+		if (matchingPixels(&inputImage->pixels[pixel], &prevPixel))
+		{
+			if (run == 62)
+			{
+				// Run is max
+				// Save Run
+			}
+			else
+			{
+				// Handle more than 62 in a row
+				run++;
+			}
+			continue;
+		}
+
+		if (run > 0)
+		{
+			// Save Run
+		}
+
+		// If in array then OP_INDEX
+		if (matchingPixels(&inputImage->pixels[pixel], &runningArray[getQOIHash(&inputImage->pixels[pixel])]))
+		{
+			// OP_INDEX
+		}
+		// Try OP_DIFF
+		// Try OP_LUMA
+		// IF alpha is the same then OP_RGB
+		// OP_RGBA
+	}
+
+	// 8 Byte footer (7 0x00s followed by a 0x01)
+	for (int i = 0; i < 7; i++)
+	{
+		outputImage->data[dataIndex] = 0x00;
+		dataIndex++;
+	}
+	outputImage->data[dataIndex] = 0x01;
+
+	outputImage->dataSize = dataIndex + 1;
+
+	return 0;
+}
 
 int main(void)
 {
