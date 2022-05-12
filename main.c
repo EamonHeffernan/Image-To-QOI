@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -40,6 +41,33 @@ int getQOIHash(struct Pixel *p)
 	return (p->r * 3 + p->g * 5 + p->b * 7 + p->a * 11) % 64;
 };
 
+int withinWrappedRange(int original, int comparison, int minOffset, int maxOffset)
+{
+	if (comparison >= original - minOffset && comparison <= original + maxOffset)
+	{
+		return comparison - original;
+	}
+	if (original - minOffset < 0 && comparison >= 256 + (original - minOffset))
+	{
+		// Over Wrapped Min
+		return comparison - (original + 256);
+	}
+	if (original + maxOffset > 255 && comparison <= original + maxOffset - 256)
+	{
+		// Under Wrapped Max
+		return comparison - (original - 256);
+	}
+	return INT_MIN;
+}
+
+void writeIntToByteArray(char *bytes, int index, int value)
+{
+	for (int i = 0; i < 4; i++)
+	{
+		bytes[index + i] = (value >> ((3 - i) * 8)) & 0xFF;
+	}
+}
+
 int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 {
 	// There are 14 bytes in the header and 8 in the the footer.
@@ -63,9 +91,9 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 	outputImage->data[2] = 'i';
 	outputImage->data[3] = 'f';
 	// 4 Bytes
-	outputImage->data[4] = inputImage->width;
+	writeIntToByteArray(outputImage->data, 4, inputImage->width);
 	// 4 Bytes
-	outputImage->data[8] = inputImage->height;
+	writeIntToByteArray(outputImage->data, 8, inputImage->height);
 	outputImage->data[12] = 0x04;
 	outputImage->data[13] = 0x00;
 
@@ -113,15 +141,47 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 		else if (currentPixel.a == prevPixel.a)
 		{
 			// Try OP_DIFF
+			int dr = withinWrappedRange(prevPixel.r, currentPixel.r, 2, 1);
+			int dg = withinWrappedRange(prevPixel.g, currentPixel.g, 2, 1);
+			int db = withinWrappedRange(prevPixel.b, currentPixel.b, 2, 1);
+			if (dataIndex == 16)
+			{
+				printf("%d,%d,%d\n", prevPixel.r, prevPixel.g, prevPixel.b);
+				printf("%d,%d,%d\n", currentPixel.r, currentPixel.g, currentPixel.b);
+				printf("%d,%d,%d\n", dr, dg, db);
+			}
+			if (dr != INT_MIN && dg != INT_MIN && db != INT_MIN)
+			{
+				// OP_DIFF
+				outputImage->data[dataIndex] = 0b01000000 | (dr + 2) << 4 | (dg + 2) << 2 | (db + 2);
+				dataIndex++;
+			}
+			else
+			{
+				// Try OP_LUMA
+				dg = withinWrappedRange(prevPixel.g, currentPixel.g, 32, 31);
+				// Max value is prev + (dg + 7)
+				// Min value is prev + (dg - 8)
+				dr = withinWrappedRange(prevPixel.r + dg, currentPixel.r, 8, 7);
+				db = withinWrappedRange(prevPixel.b + dg, currentPixel.b, 8, 7);
 
-			// Try OP_LUMA
-
-			// Otherwise OP_RGB
-			outputImage->data[dataIndex] = 0xFE;
-			outputImage->data[dataIndex + 1] = currentPixel.r;
-			outputImage->data[dataIndex + 2] = currentPixel.g;
-			outputImage->data[dataIndex + 3] = currentPixel.b;
-			dataIndex += 4;
+				if (dg != INT_MIN && dr != INT_MIN && db != INT_MIN)
+				{
+					// OP_LUMA
+					outputImage->data[dataIndex] = 0b10000000 | (dg + 32);
+					outputImage->data[dataIndex + 1] = (dr + 8) << 4 | (db + 8);
+					dataIndex += 2;
+				}
+				else
+				{
+					// Otherwise OP_RGB
+					outputImage->data[dataIndex] = 0xFE;
+					outputImage->data[dataIndex + 1] = currentPixel.r;
+					outputImage->data[dataIndex + 2] = currentPixel.g;
+					outputImage->data[dataIndex + 3] = currentPixel.b;
+					dataIndex += 4;
+				}
+			}
 		}
 		else
 		{
@@ -137,6 +197,13 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 		// Save current pixel
 		prevPixel = currentPixel;
 		runningArray[QOIHash] = currentPixel;
+	}
+	// If the image ends on a run.
+	if (run > 0)
+	{
+		// Save Run
+		outputImage->data[dataIndex] = 0b11000000 | run - 1;
+		dataIndex++;
 	}
 
 	// 8 Byte footer (7 0x00s followed by a 0x01)
@@ -187,14 +254,14 @@ int main(void)
 	inputImage.height = y;
 	inputImage.pixels = pixels;
 
-	for (int i = 0; i < x * y; i++)
-	{
-		printf("%d\n", inputImage.pixels[i].r);
-		printf("%d\n", inputImage.pixels[i].g);
-		printf("%d\n", inputImage.pixels[i].b);
-		printf("%d\n", inputImage.pixels[i].a);
-	}
-	printf("%d\n", inputImage.width);
+	struct OutputImage outputImage;
+	convertToQOI(&inputImage, &outputImage);
+
+	FILE *f = fopen("output.qoi", "wb");
+
+	fwrite(outputImage.data, sizeof(char), outputImage.dataSize, f);
+
+	fclose(f);
 
 	stbi_image_free(data);
 	return 0;
