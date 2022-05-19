@@ -2,30 +2,17 @@
  * FILENAME :        encodeQOI.c
  *
  * DESCRIPTION :
- *       File compression and decompression routines.
+ *       Image data importing via stb_image, image encoding and saving
+ * 		 according to the specifications listed at https://qoiformat.org/
  *
- * PUBLIC FUNCTIONS :
- *       int     FM_CompressFile( FileHandle )
- *       int     FM_DecompressFile( FileHandle )
- *
- * NOTES :
- *       These functions are a part of the FM suite;
- *       See IMS FM0121 for detailed description.
- *
- *       Copyright A.N.Other Co. 1990, 1995.  All rights reserved.
- *
- * AUTHOR :    Arthur Other        START DATE :    16 Jan 99
- *
- * CHANGES :
- *
- * REF NO  VERSION DATE    WHO     DETAIL
- * F21/33  A.03.04 22Jan99 JR      Function CalcHuffman corrected
+ * AUTHOR :    Eamon Heffernan        START DATE :    04 May 22
  *
  *H*/
 
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 // Importing the STB Image library to handle png and jpeg decoding.
 #define STB_IMAGE_IMPLEMENTATION
@@ -43,7 +30,7 @@ struct InputImage
 {
 	unsigned int width;
 	unsigned int height;
-	char *fileLocation;
+	char fileLocation[261];
 	// InputType inputType;
 	struct Pixel *pixels;
 };
@@ -135,7 +122,7 @@ void writeIntToByteArray(char *bytes, int index, int value)
 }
 
 // Saves a run of pixels to the data of the output image.
-void saveRun(char *data, unsigned int *run, int *dataIndex)
+void saveRun(char *data, unsigned char *run, int *dataIndex)
 {
 	// A run is used when there are multiple pixels of the same value in a row.
 	// The first pixel is saved with a different operation and subsequent pixels are
@@ -154,7 +141,7 @@ void saveRun(char *data, unsigned int *run, int *dataIndex)
 	// one byte.
 	data[*dataIndex] = 0b11000000 | *run - 1;
 
-	*dataIndex++;
+	*dataIndex = *dataIndex + 1;
 	*run = 0;
 }
 
@@ -366,50 +353,76 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 	return 0;
 }
 
-int main(void)
+void importImage(char fileLocation[261], struct InputImage *inputImage)
 {
-	char *fileLocation = "./wikipedia_008.png";
-
 	int x, y, n;
 
 	int channels = 4;
 
 	unsigned char *data = stbi_load(fileLocation, &x, &y, &n, channels);
 
-	printf("%d\n", x);
-	printf("%d\n", y);
-	printf("%d\n", n);
-
-	struct Pixel *pixels = malloc(sizeof(struct Pixel) * x * y);
+	memcpy(inputImage->fileLocation, fileLocation, 261);
+	inputImage->width = x;
+	inputImage->height = y;
+	inputImage->pixels = malloc(sizeof(struct Pixel) * x * y);
 
 	for (int i = 0; i < x * y; i++)
 	{
 		// For each pixel, save each channel
 		for (int j = 0; j < channels; j++)
 		{
-			pixels[i].r = data[i * channels + 0];
-			pixels[i].g = data[i * channels + 1];
-			pixels[i].b = data[i * channels + 2];
-			pixels[i].a = data[i * channels + 3];
+			inputImage->pixels[i].r = data[i * channels + 0];
+			inputImage->pixels[i].g = data[i * channels + 1];
+			inputImage->pixels[i].b = data[i * channels + 2];
+			inputImage->pixels[i].a = data[i * channels + 3];
 		}
 	}
 
-	struct InputImage inputImage;
+	stbi_image_free(data);
+}
 
-	inputImage.fileLocation = fileLocation;
-	inputImage.width = x;
-	inputImage.height = y;
-	inputImage.pixels = pixels;
+void exportQOI(char fileLocation[261], struct OutputImage *outputImage)
+{
+	FILE *f = fopen(fileLocation, "wb");
 
-	struct OutputImage outputImage;
-	convertToQOI(&inputImage, &outputImage);
-
-	FILE *f = fopen("wp.qoi", "wb");
-
-	fwrite(outputImage.data, sizeof(char), outputImage.dataSize, f);
+	fwrite(outputImage->data, sizeof(char), outputImage->dataSize, f);
 
 	fclose(f);
+}
 
-	stbi_image_free(data);
+int main(void)
+{
+	// TODO: MAKE MENU AND MAKE WORK WITH COMMAND LINE ARGUMENTS
+
+	while (true)
+	{
+		printf("Welcome to the QOI image convertor.\n");
+		printf("Please enter the location of the file you would like to convert:\n");
+
+		char importLocation[261];
+		printf("Enter name: ");
+		scanf("%s", importLocation);
+
+		if (access(importLocation, F_OK) != -1)
+		{
+			printf("file is found");
+			printf("\nImporting");
+			struct InputImage inputImage;
+			importImage(importLocation, &inputImage);
+			printf("\nDone Importing");
+
+			struct OutputImage outputImage;
+
+			convertToQOI(&inputImage, &outputImage);
+
+			exportQOI("output.qoi", &outputImage);
+
+			printf("\nDone");
+		}
+		else
+		{
+			printf("file is not found");
+		}
+	}
 	return 0;
 }

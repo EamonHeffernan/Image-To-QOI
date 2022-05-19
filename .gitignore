@@ -50,6 +50,6 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-main
+encodeQOI
 .DS_STORE
 *.qoi
