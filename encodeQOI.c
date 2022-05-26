@@ -12,7 +12,14 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
+
+// Imports for sleep
+#ifdef _WIN32
+#include <Windows.h>
+#else
 #include <unistd.h>
+#endif
 
 // Importing the STB Image library to handle png and jpeg decoding.
 #define STB_IMAGE_IMPLEMENTATION
@@ -30,8 +37,7 @@ struct InputImage
 {
 	unsigned int width;
 	unsigned int height;
-	char fileLocation[261];
-	// InputType inputType;
+	char *fileLocation;
 	struct Pixel *pixels;
 };
 
@@ -353,7 +359,7 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 	return 0;
 }
 
-void importImage(char fileLocation[261], struct InputImage *inputImage)
+void importImage(char *fileLocation, struct InputImage *inputImage)
 {
 	int x, y, n;
 
@@ -361,7 +367,9 @@ void importImage(char fileLocation[261], struct InputImage *inputImage)
 
 	unsigned char *data = stbi_load(fileLocation, &x, &y, &n, channels);
 
-	memcpy(inputImage->fileLocation, fileLocation, 261);
+	inputImage->fileLocation = malloc(sizeof(char) * 261);
+	strcpy(inputImage->fileLocation, fileLocation);
+
 	inputImage->width = x;
 	inputImage->height = y;
 	inputImage->pixels = malloc(sizeof(struct Pixel) * x * y);
@@ -381,7 +389,7 @@ void importImage(char fileLocation[261], struct InputImage *inputImage)
 	stbi_image_free(data);
 }
 
-void exportQOI(char fileLocation[261], struct OutputImage *outputImage)
+void exportQOI(char *fileLocation, struct OutputImage *outputImage)
 {
 	FILE *f = fopen(fileLocation, "wb");
 
@@ -390,39 +398,60 @@ void exportQOI(char fileLocation[261], struct OutputImage *outputImage)
 	fclose(f);
 }
 
-int main(void)
+char *getLocation(bool import)
 {
-	// TODO: MAKE MENU AND MAKE WORK WITH COMMAND LINE ARGUMENTS
-
 	while (true)
 	{
-		printf("Welcome to the QOI image convertor.\n");
-		printf("Please enter the location of the file you would like to convert:\n");
-
-		char importLocation[261];
-		printf("Enter name: ");
-		scanf("%s", importLocation);
-
-		if (access(importLocation, F_OK) != -1)
+		char *location = malloc(sizeof(char) * 261);
+		if (import)
 		{
-			printf("file is found");
-			printf("\nImporting");
-			struct InputImage inputImage;
-			importImage(importLocation, &inputImage);
-			printf("\nDone Importing");
-
-			struct OutputImage outputImage;
-
-			convertToQOI(&inputImage, &outputImage);
-
-			exportQOI("output.qoi", &outputImage);
-
-			printf("\nDone");
+			printf("Please enter the location of the file you would like to convert:\n");
 		}
 		else
 		{
-			printf("file is not found");
+			printf("Please enter the location you wish to save as:\n");
+		}
+		scanf("%s", location);
+		if (access(location, F_OK) != -1 || !import)
+		{
+			if (import)
+			{
+				printf("Imported");
+			}
+			else
+			{
+				printf("Exported");
+			}
+			printf(" file\n");
+			return location;
+		}
+		else
+		{
+			printf("File not found. Try Again\n");
 		}
 	}
+}
+
+int main(void)
+{
+	printf("Welcome to the QOI image convertor.\n");
+
+	char *importLocation = malloc(sizeof(char) * 261);
+	strcpy(importLocation, getLocation(true));
+
+	struct InputImage inputImage;
+	importImage(importLocation, &inputImage);
+
+	struct OutputImage outputImage;
+	convertToQOI(&inputImage, &outputImage);
+
+	char *exportLocation = malloc(sizeof(char) * 261);
+	strcpy(exportLocation, getLocation(false));
+
+	exportQOI(exportLocation, &outputImage);
+
+	free(exportLocation);
+	free(importLocation);
+
 	return 0;
 }
