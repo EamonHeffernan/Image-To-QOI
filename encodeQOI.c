@@ -436,13 +436,19 @@ int main(void)
 {
 	printf("Welcome to the QOI image convertor.\n");
 
+	// Preallocate the maximum space for the location string.
 	char *importLocation = malloc(sizeof(char) * 261);
+	// Copy the value of getLocation to the memory allocated previously.
 	strcpy(importLocation, getLocation(true));
 
 	struct InputImage inputImage;
+	// Import the image located at the file location inputted previously.
 	importImage(importLocation, &inputImage);
 
+	// Creates an empty output image to be filled.
 	struct OutputImage outputImage;
+	// Converts the input image into an output image.
+	// Passing both input and output image by reference
 	convertToQOI(&inputImage, &outputImage);
 
 	char *exportLocation = malloc(sizeof(char) * 261);
