@@ -50,6 +50,16 @@ struct OutputImage
 	unsigned int dataSize;
 };
 
+void waitForInput()
+{
+	// Flush any previous input from the stream.
+	fflush(stdin);
+
+	printf("Press ENTER to continue...");
+	// Waits for the enter key.
+	getchar();
+}
+
 // Compares 2 pixels and determines if all the values are the same.
 bool matchingPixels(struct Pixel *p1, struct Pixel *p2)
 {
@@ -423,18 +433,66 @@ char *getLocation(bool import)
 				printf("Exported");
 			}
 			printf(" file\n");
+			waitForInput();
 			return location;
 		}
 		else
 		{
 			printf("File not found. Try Again\n");
+			waitForInput();
 		}
 	}
 }
 
-int main(void)
+// Reads the provided args and returns a code based on result.
+// -1 = Source File Does Not Exist
+// 0 = Incorrect Format
+// 1 = Success
+int readArgs(int argc, char *argv[], char *importLocation, char *exportLocation)
 {
-	printf("Welcome to the QOI image convertor.\n");
+	// Should be 5 args for a correctly formatted request.
+	// exec, tag 1, path, tag 2, path
+	if (argc != 5)
+	{
+		// Not enough args.
+		return 0;
+	}
+	else
+	{
+		// Arg 0 is executable.
+		// Arg 1 & 3 should be the parameter tags
+		// Arg 2 & 4 should be the file paths.
+
+		if ((strcmp(argv[1], "-s") == 0 || strcmp(argv[1], "--source") == 0) && (strcmp(argv[3], "-d") == 0 || strcmp(argv[3], "--destination") == 0))
+		{
+			// Arg 2 is source path.
+			// Arg 4 is destination path.
+			strcpy(importLocation, argv[2]);
+			strcpy(exportLocation, argv[4]);
+		}
+		else if ((strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--destination") == 0) && (strcmp(argv[3], "-s") == 0 || strcmp(argv[3], "--source") == 0))
+		{
+			// Arg 2 is destination path.
+			// Arg 4 is source path.
+			strcpy(exportLocation, argv[2]);
+			strcpy(importLocation, argv[4]);
+		}
+		else
+		{
+			// Incorrect Format.
+			return 0;
+		}
+
+		// The access function determines if there is a file at the location.
+		// Check if it returns -1, if it does, return -1 (Error code for missing source)
+		// and if it doesn't, return success.
+		return access(importLocation, F_OK) == -1 ? -1 : 1;
+	}
+}
+
+void startMenu()
+{
+	printf("Welcome to Encode QOI.\n");
 
 	// Preallocate the maximum space for the location string.
 	char *importLocation = malloc(sizeof(char) * 261);
@@ -451,13 +509,76 @@ int main(void)
 	// Passing both input and output image by reference
 	convertToQOI(&inputImage, &outputImage);
 
+	// Get the intended location for the export.
+	// Must allocate memory space first.
 	char *exportLocation = malloc(sizeof(char) * 261);
 	strcpy(exportLocation, getLocation(false));
 
+	// Export the image to the given location.
 	exportQOI(exportLocation, &outputImage);
 
+	// Free up the allocated memory.
 	free(exportLocation);
 	free(importLocation);
+}
+
+void startCommandLine(int argc, char *argv[])
+{
+	// Preallocate the maximum space for the location strings.
+	char *importLocation = malloc(sizeof(char) * 261);
+	char *exportLocation = malloc(sizeof(char) * 261);
+
+	int argResult = readArgs(argc, argv, importLocation, exportLocation);
+
+	if (argResult == 1)
+	{
+		// Similar to the menu script but doesn't have steps in between to get other information.
+
+		struct InputImage inputImage;
+		// Import the image located at the file location inputted previously.
+		importImage(importLocation, &inputImage);
+
+		// Creates an empty output image to be filled.
+		struct OutputImage outputImage;
+		// Converts the input image into an output image.
+		// Passing both input and output image by reference
+		convertToQOI(&inputImage, &outputImage);
+
+		// Export the image to the given location.
+		exportQOI(exportLocation, &outputImage);
+	}
+	else if (argResult == -1)
+	{
+		printf("Source file does not exist.\n");
+	}
+	else if (argResult == 0)
+	{
+		printf("Encode QOI.\n");
+		printf("Reads images in other formats and encodes them with QOI.\n");
+		printf("QOI specifications are available at https://qoiformat.org/\n");
+		printf("\n");
+		printf("Usage:\n");
+		printf("  encodeQOI\n");
+		printf("Options:\n");
+		printf("  -h --help\t\t\t\t\tShow this screen.\n");
+		printf("  (-s | --source) <source file>\t\t\tSet the source file\n");
+		printf("  (-d | --destination) <destination file>\tSet the destination file\n");
+	}
+	// Free up the allocated memory.
+	free(exportLocation);
+	free(importLocation);
+}
+
+int main(int argc, char *argv[])
+{
+	if (argc > 1)
+	{
+		startCommandLine(argc, argv);
+	}
+	else
+	{
+		startMenu();
+	}
 
 	return 0;
 }
