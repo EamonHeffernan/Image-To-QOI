@@ -14,9 +14,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Imports for sleep
+// Different operating systems have different functions for accessing files.
+// Use macro definition to set a function for windows that behaves the same as the POSIX one.
 #ifdef _WIN32
-#include <Windows.h>
+inline int access(const char *pathname, int mode)
+{
+	return _access(pathname, mode);
+}
 #else
 #include <unistd.h>
 #endif
@@ -371,38 +375,46 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 
 void importImage(char *fileLocation, struct InputImage *inputImage)
 {
+	// Predefine the values to be set by the stb_image import.
 	int x, y, n;
 
 	int channels = 4;
 
+	// Use the stb_image library to load images of many types.
+	// Returns a one dimensional array of pixel values.
+	// Each pixel is 4 values in the array (r,g,b,a) and the array length is pixels * 4.
 	unsigned char *data = stbi_load(fileLocation, &x, &y, &n, channels);
 
+	// String for file location has to be preallocated.
 	inputImage->fileLocation = malloc(sizeof(char) * 261);
 	strcpy(inputImage->fileLocation, fileLocation);
 
 	inputImage->width = x;
 	inputImage->height = y;
+	// Preallocate the size of all the pixels to the array.
 	inputImage->pixels = malloc(sizeof(struct Pixel) * x * y);
 
+	// For each pixel, save each channel
 	for (int i = 0; i < x * y; i++)
 	{
-		// For each pixel, save each channel
-		for (int j = 0; j < channels; j++)
-		{
-			inputImage->pixels[i].r = data[i * channels + 0];
-			inputImage->pixels[i].g = data[i * channels + 1];
-			inputImage->pixels[i].b = data[i * channels + 2];
-			inputImage->pixels[i].a = data[i * channels + 3];
-		}
+		// i * channels because each pixel takes up that number of array slots.
+		inputImage->pixels[i].r = data[i * channels + 0];
+		inputImage->pixels[i].g = data[i * channels + 1];
+		inputImage->pixels[i].b = data[i * channels + 2];
+		inputImage->pixels[i].a = data[i * channels + 3];
 	}
 
+	// Free up image memory.
 	stbi_image_free(data);
 }
 
 void exportQOI(char *fileLocation, struct OutputImage *outputImage)
 {
+	// Open file in writing, binary mode.
 	FILE *f = fopen(fileLocation, "wb");
 
+	// Write all the data stored in the output image.
+	// Provide that there are data size * size of char bytes to write.
 	fwrite(outputImage->data, sizeof(char), outputImage->dataSize, f);
 
 	fclose(f);
@@ -410,9 +422,13 @@ void exportQOI(char *fileLocation, struct OutputImage *outputImage)
 
 char *getLocation(bool import)
 {
+	// Loop until information that is required has been provided.
 	while (true)
 	{
+		// Preallocate the space for the response.
 		char *location = malloc(sizeof(char) * 261);
+
+		// Different messages based on the required file.
 		if (import)
 		{
 			printf("Please enter the location of the file you would like to convert:\n");
@@ -421,9 +437,14 @@ char *getLocation(bool import)
 		{
 			printf("Please enter the location you wish to save as:\n");
 		}
+		// Get the string from the user and copy it to the memory allocated to location.
 		scanf("%s", location);
+
+		// If an import file is being gathered, check it exists.
+		// Allow through if not import file.
 		if (access(location, F_OK) != -1 || !import)
 		{
+			// Print the result text and return the location.
 			if (import)
 			{
 				printf("Imported");
@@ -438,6 +459,7 @@ char *getLocation(bool import)
 		}
 		else
 		{
+			// File not found, restart the loop.
 			printf("File not found. Try Again\n");
 			waitForInput();
 		}
@@ -553,6 +575,7 @@ void startCommandLine(int argc, char *argv[])
 	}
 	else if (argResult == 0)
 	{
+		// Help Menu
 		printf("Encode QOI.\n");
 		printf("Reads images in other formats and encodes them with QOI.\n");
 		printf("QOI specifications are available at https://qoiformat.org/\n");
@@ -571,6 +594,7 @@ void startCommandLine(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+	// 1 arg is always used as the executable.
 	if (argc > 1)
 	{
 		startCommandLine(argc, argv);
