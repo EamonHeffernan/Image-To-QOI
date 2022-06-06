@@ -541,7 +541,7 @@ void startMenu()
 	// Export the image to the given location.
 	exportQOI(exportLocation, &outputImage);
 
-	// Free up the allocated memory.v
+	// Free up the allocated memory.
 	free(outputImage.data);
 	free(outputImage.fileLocation);
 	free(exportLocation);
