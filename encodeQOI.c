@@ -2,7 +2,7 @@
  * FILENAME :        encodeQOI.c
  *
  * DESCRIPTION :
- *       Image data importing via stb_image, image encoding and saving
+ *       Image data importing via stb_image (https://github.com/nothings/stb), image encoding and saving
  * 		 according to the specifications listed at https://qoiformat.org/
  *
  * AUTHOR :    Eamon Heffernan        START DATE :    04 May 22
@@ -26,6 +26,7 @@ inline int access(const char *pathname, int mode)
 #endif
 
 // Importing the STB Image library to handle png and jpeg decoding.
+// https://github.com/nothings/stb
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -373,12 +374,12 @@ void convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage
 
 void importImage(char *fileLocation, struct InputImage *inputImage)
 {
-	// Predefine the values to be set by the stb_image import.
+	// Predefine the values to be set by the stb_image import (https://github.com/nothings/stb).
 	int x, y, n;
 
 	int channels = 4;
 
-	// Use the stb_image library to load images of many types.
+	// Use the stb_image library (https://github.com/nothings/stb) to load images of many types.
 	// Returns a one dimensional array of pixel values.
 	// Each pixel is 4 values in the array (r,g,b,a) and the array length is pixels * 4.
 	unsigned char *data = stbi_load(fileLocation, &x, &y, &n, channels);
