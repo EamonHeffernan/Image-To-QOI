@@ -165,7 +165,7 @@ void saveRun(char *data, unsigned char *run, int *dataIndex)
 	*run = 0;
 }
 
-int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
+void convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 {
 	// There are 14 bytes in the header and 8 in the the footer.
 	// 5 bytes is the largest possible size of one pixel.
@@ -369,8 +369,6 @@ int convertToQOI(struct InputImage *inputImage, struct OutputImage *outputImage)
 
 	// Set the dataSize of the output image.
 	outputImage->dataSize = dataIndex;
-
-	return 0;
 }
 
 void importImage(char *fileLocation, struct InputImage *inputImage)
@@ -531,6 +529,10 @@ void startMenu()
 	// Passing both input and output image by reference
 	convertToQOI(&inputImage, &outputImage);
 
+	// Free up input image memory.
+	free(inputImage.pixels);
+	free(inputImage.fileLocation);
+
 	// Get the intended location for the export.
 	// Must allocate memory space first.
 	char *exportLocation = malloc(sizeof(char) * 261);
@@ -539,7 +541,9 @@ void startMenu()
 	// Export the image to the given location.
 	exportQOI(exportLocation, &outputImage);
 
-	// Free up the allocated memory.
+	// Free up the allocated memory.v
+	free(outputImage.data);
+	free(outputImage.fileLocation);
 	free(exportLocation);
 	free(importLocation);
 }
@@ -568,6 +572,12 @@ void startCommandLine(int argc, char *argv[])
 
 		// Export the image to the given location.
 		exportQOI(exportLocation, &outputImage);
+
+		// Free up input image memory.
+		free(inputImage.pixels);
+		free(inputImage.fileLocation);
+		free(outputImage.data);
+		free(outputImage.fileLocation);
 	}
 	else if (argResult == -1)
 	{
@@ -576,6 +586,9 @@ void startCommandLine(int argc, char *argv[])
 	else if (argResult == 0)
 	{
 		// Help Menu
+		// A modular approach that allows for setting commands and automatically populating the
+		// help menu is more effort than is needed as there are very few commands. For a project with
+		// a larger scope, this would be very helpful.
 		printf("Encode QOI.\n");
 		printf("Reads images in other formats and encodes them with QOI.\n");
 		printf("QOI specifications are available at https://qoiformat.org/\n");
